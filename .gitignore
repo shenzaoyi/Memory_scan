@@ -1,0 +1,5 @@
+.vscode
+.git
+*.exe
+pmap.cpp
+Memory.cpp
