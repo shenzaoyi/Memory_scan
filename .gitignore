@@ -3,3 +3,11 @@
 *.exe
 pmap.cpp
 Memory.cpp
+main.cpp
+scan.cpp
+scan.h
+Memory.h
+visual.py
+makefile
+pmap.cpp
+hello.cpp

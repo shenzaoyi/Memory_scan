@@ -57,24 +57,24 @@ bool Scan(HANDLE handle, LPVOID base) {
         std::cout<<"Open Process Error"<<std::endl;
         return false;
     }
-    std::cout<<"Open process successfully"<<std::endl;
-    std::cout<<"======================"<<std::endl;
+    // std::cout<<"Open process successfully"<<std::endl;
+    // std::cout<<"======================"<<std::endl;
     // while(VirtualQueryEx(handle,base,&lpbuffer,sizeof(lpbuffer)) == sizeof(MEMORY_BASIC_INFORMATION)){
-    while(VirtualQueryEx(handle,base,&lpbuffer,sizeof(lpbuffer)) != 0){
+    while(true){
         // Only focus on this case, why? balabala
-        if (lpbuffer.AllocationBase == lpbuffer.BaseAddress && lpbuffer.AllocationBase != NULL){
+        if (VirtualQueryEx(handle,base,&lpbuffer,sizeof(lpbuffer)) != 0){
             // std::cout<<lpbuffer.BaseAddress<<"|"<<lpbuffer.RegionSize/1000<<GetProtectionString(lpbuffer.Protect)<<std::endl;
             SIZE_T size = lpbuffer.RegionSize;
             std::string sizeStr = GetNum(&size);
-            printf("%#X|%10d%s|%20s\n",lpbuffer.BaseAddress,size,sizeStr.c_str(),GetProtectionString(lpbuffer.Protect).c_str());
+            // printf("%#X|%10d%s|%20s\n",lpbuffer.BaseAddress,size,sizeStr.c_str(),GetProtectionString(lpbuffer.Protect).c_str());
+            printf("%#x\n",lpbuffer.BaseAddress);
         }
-        if (GetLastError() != ERROR_SUCCESS) {
-            std::cout << "Error occurred during memory scanning" << std::endl;
-            CloseHandle(handle);
-            return false;
-        }
-        base = LPVOID((LPBYTE)base + lpbuffer.RegionSize);
-    } 
-    CloseHandle(handle);
+        // if (GetLastError() != ERROR_SUCCESS) {
+        //     std::cout << "Error occurred during memory scanning" << std::endl;
+        //     CloseHandle(handle);
+        //     return false;
+        // }
+        base = LPVOID((SIZE_T)base + lpbuffer.RegionSize);
+    }
     return true;
 }
