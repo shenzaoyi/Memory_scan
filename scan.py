@@ -6,6 +6,7 @@ PROCESS_ALL_ACCESS = 0x1F0FFF
 SIZE_T = ct.c_size_t
 dll = ct.WinDLL('kernel32', use_last_error=True)
 ReadProcessMemory = ct.windll.kernel32.ReadProcessMemory
+WriteProcessMemory = ct.windll.kernel32.WriteProcessMemory
 VirtualQueryEx = dll.VirtualQueryEx
 CreateBufferString = ct.create_string_buffer
 CreateBufferInt = ct.c_int
@@ -53,7 +54,8 @@ class MEMORY_BASIC_INFORMATION(ct.Structure):
 
     def __repr__(self):
         return f'{self.BaseAddress if self.BaseAddress is not None else 0:#x}  ' \
-        f'{get_rwx(self.Protect)}\n ' 
+        f'{get_rwx(self.Protect)}' \
+        f'RegionSize={self.RegionSize:#x} \n' 
                     # f'{self.RegionSize/1024}'\
                                         # f'AllocationBase={self.AllocationBase if self.AllocationBase is not None else 0:#x}, ' \
                                         # f'AllocationProtect={self.AllocationProtect:#x}, ' \
@@ -82,7 +84,7 @@ def scan(h):
         mbi = MEMORY_BASIC_INFORMATION()
         result = VirtualQueryEx(h, address, ct.byref(mbi), ct.sizeof(mbi))
         if result:
-            # print(mbi)
+            print(mbi)
             address += mbi.RegionSize
             mbi_list.append(mbi)
         else:
@@ -102,8 +104,10 @@ def save_in_list(mbi_list,h):
         buffer = CreateBufferString(item.RegionSize)
         read_size = ct.c_size_t()
         ReadProcessMemory(h,ct.c_void_p(item.BaseAddress),buffer,ct.sizeof(buffer),ct.byref(read_size))
-        if (read_size != 0):
+        if (read_size == read_size):
             buffer_list.append(buffer)
+        else: 
+            print("error" + str(ct.get_last_error()))
     return buffer_list
 
 # 得到所有和给定值匹配的地址
@@ -112,11 +116,14 @@ def pattern_match(buffer_list, target_value,result):
     address_list = []
     for i in range(len(buffer_list)): 
         data = buffer_list[i].raw
-        index = data.find(pattern)
-        if (index == -1 ): 
-            continue
-        else: 
+        # index = data.find(pattern) find只能找第一个，垃圾Python, 毁我青春，断我前途
+        start_index = 0  # 初始化搜索的起始位置
+        while True:
+            index = data.find(pattern, start_index)
+            if index == -1:
+                break  # 如果没有找到更多匹配项，退出循环
             address_list.append(result[i].BaseAddress + index)
+            start_index = index + len(pattern)  # 更新起始位置，继续搜索下一个匹配项
     return address_list
         
 def select(address_list, target, h):
@@ -131,25 +138,37 @@ def select(address_list, target, h):
         else:
             print("error" + str(ct.get_last_error()))
     return filtered_list
+
+def write_memory(h, address, value):
+    buffer = CreateBufferString(4)
+    buffer.raw = (value).to_bytes(4, byteorder='little')
+    size = ct.c_size_t()
+    WriteProcessMemory(h, ct.c_void_p(address), buffer, ct.sizeof(buffer), size)
+    print(size.value)
+    print(ct.sizeof(buffer))
+    if size.value == ct.sizeof(buffer):
+        print("write success")
+    else:
+        print("write failed" + str(ct.get_last_error()))
+
 def main():
     init = input("Please input the init number: ") 
     h = get_handle()
+    scan(h)
     result = filter(scan(h))
     buffer_list = save_in_list(result,h)
     matched_list = pattern_match(buffer_list, int(init),result)
-    print(matched_list)
-    # # buffer = CreateBufferInt()
-    # buffer = CreateBufferString(4)
-    # if (ReadProcessMemory(h,ct.c_void_p(matched_list[0]),buffer,ct.sizeof(buffer),ct.byref(ct.c_size_t())) != 0): 
-    #     print(buffer.value)
-    # else: 
-    #     print("error" + str(ct.get_last_error()))
     while True: 
         num = input("Please input the new value : ")
         if (num == "break"): 
             break
         matched_list = select(matched_list, int(num), h)
         print("remain: " + str(len(matched_list)))
-        print(matched_list)
-
+        for item in matched_list:
+            print(hex(item))
+    for i in range (len(matched_list)): 
+        print(str(i) + " : " + hex(matched_list[i]))
+    choice = input("Please input the address you want to change: ")
+    value = input("Please input the new value: ")
+    write(h, matched_list[int(choice)], int(value))
 main()
